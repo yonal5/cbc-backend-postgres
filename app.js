@@ -12,24 +12,32 @@ dotenv.config();
 
 const app = express();
 
-/* ---------- MIDDLEWARE ---------- */
 app.use(cors());
 app.use(express.json());
 
+/* ---------- TEST ROUTE ---------- */
+app.get("/", (req, res) => {
+    res.json({
+        success: true,
+        message: "CBC Backend API is running",
+    });
+});
+
+/* ---------- AUTH MIDDLEWARE ---------- */
 app.use((req, res, next) => {
-  let token = req.header("Authorization");
+    let token = req.header("Authorization");
 
-  if (token) {
-    token = token.replace("Bearer ", "");
+    if (token) {
+        token = token.replace("Bearer ", "");
 
-    try {
-      req.user = jwt.verify(token, process.env.JWT_SECRET);
-    } catch (error) {
-      // Invalid tokens are ignored here; protected routes still enforce auth.
+        try {
+            req.user = jwt.verify(token, process.env.JWT_SECRET);
+        } catch (error) {
+            // Invalid tokens are ignored.
+        }
     }
-  }
 
-  next();
+    next();
 });
 
 /* ---------- ROUTES ---------- */
@@ -37,6 +45,15 @@ app.use("/api/users", userRouter);
 app.use("/api/products", productRouter);
 app.use("/api/chat", chatRouter);
 app.use("/api/admin", adminRouter);
+
 app.use("/uploads", express.static("uploads"));
+
+/* ---------- 404 HANDLER ---------- */
+app.use((req, res) => {
+    res.status(404).json({
+        success: false,
+        message: `Route not found: ${req.method} ${req.originalUrl}`,
+    });
+});
 
 export default app;
