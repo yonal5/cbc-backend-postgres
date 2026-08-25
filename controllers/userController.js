@@ -30,33 +30,34 @@ const transporter = nodemailer.createTransport({
 
 export async function createUser(req, res) {
     try {
+        console.log("REGISTER REQUEST:", req.body);
+
         const {
             email,
             firstName,
             lastName,
-            password,
+            password
         } = req.body;
 
         if (!email || !firstName || !lastName || !password) {
             return res.status(400).json({
-                message: "All fields are required",
+                success: false,
+                message: "All fields are required"
             });
         }
 
         const existingUser = await User.findByEmail(email);
 
         if (existingUser) {
-            return res.status(400).json({
-                message: "User already exists",
+            return res.status(409).json({
+                success: false,
+                message: "Email already registered"
             });
         }
 
-        const hashedPassword = bcrypt.hashSync(
-            password,
-            10
-        );
+        const hashedPassword = bcrypt.hashSync(password, 10);
 
-        await User.create({
+        const user = await User.create({
             email,
             firstName,
             lastName,
@@ -64,19 +65,32 @@ export async function createUser(req, res) {
             role: "user",
             isBlock: false,
             isEmailVerified: false,
-            image: "/user.png",
+            image: "/user.png"
         });
 
-        res.status(201).json({
+        console.log("USER CREATED:", user);
+
+        return res.status(201).json({
+            success: true,
             message: "User created successfully",
+            user: {
+                id: user.id,
+                email: user.email,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                role: user.role
+            }
         });
-    } catch (err) {
-        console.error("CREATE USER ERROR:", err);
 
-        res.status(500).json({
+    } catch (err) {
+        console.error("REGISTER ERROR:", err);
+
+        return res.status(500).json({
             success: false,
             message: "Failed to create user",
             error: err.message,
+            code: err.code || null,
+            detail: err.detail || null
         });
     }
 }
