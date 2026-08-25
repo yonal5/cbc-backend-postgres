@@ -9,13 +9,22 @@ const User = {
         role = "user",
         isBlock = false,
         isEmailVerified = false,
-        image = "/user.png"
+        image = "/user.png",
     }) {
         const result = await db.query(
             `INSERT INTO users
-            (email, first_name, last_name, password, role, is_block, is_email_verified, image)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-            RETURNING
+                (
+                    email,
+                    first_name,
+                    last_name,
+                    password,
+                    role,
+                    is_block,
+                    is_email_verified,
+                    image
+                )
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+             RETURNING
                 id,
                 email,
                 first_name AS "firstName",
@@ -33,7 +42,7 @@ const User = {
                 role,
                 isBlock,
                 isEmailVerified,
-                image
+                image,
             ]
         );
 
@@ -118,7 +127,7 @@ const User = {
             role: "role",
             isBlock: "is_block",
             isEmailVerified: "is_email_verified",
-            image: "image"
+            image: "image",
         };
 
         const updates = [];
@@ -167,7 +176,7 @@ const User = {
             role: "role",
             isBlock: "is_block",
             isEmailVerified: "is_email_verified",
-            image: "image"
+            image: "image",
         };
 
         const updates = [];
@@ -197,7 +206,6 @@ const User = {
                 email,
                 first_name AS "firstName",
                 last_name AS "lastName",
-                password,
                 role,
                 is_block AS "isBlock",
                 is_email_verified AS "isEmailVerified",
@@ -217,7 +225,7 @@ const User = {
         );
 
         return result.rows[0] || null;
-    }
+    },
 };
 
 export default User;
