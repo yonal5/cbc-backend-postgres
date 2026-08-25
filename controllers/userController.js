@@ -9,6 +9,10 @@ import getDesignedEmail from "../lib/emailDesigner.js";
 
 dotenv.config();
 
+/* =========================
+   EMAIL
+========================= */
+
 const transporter = nodemailer.createTransport({
     service: "gmail",
     host: "smtp.gmail.com",
@@ -20,40 +24,62 @@ const transporter = nodemailer.createTransport({
     },
 });
 
-
 /* =========================
    CREATE USER
 ========================= */
 
 export async function createUser(req, res) {
     try {
+        const {
+            email,
+            firstName,
+            lastName,
+            password,
+        } = req.body;
+
+        if (!email || !firstName || !lastName || !password) {
+            return res.status(400).json({
+                message: "All fields are required",
+            });
+        }
+
+        const existingUser = await User.findByEmail(email);
+
+        if (existingUser) {
+            return res.status(400).json({
+                message: "User already exists",
+            });
+        }
+
         const hashedPassword = bcrypt.hashSync(
-            req.body.password,
+            password,
             10
         );
 
         await User.create({
-            email: req.body.email,
-            firstName: req.body.firstName,
-            lastName: req.body.lastName,
+            email,
+            firstName,
+            lastName,
             password: hashedPassword,
+            role: "user",
+            isBlock: false,
+            isEmailVerified: false,
+            image: "/user.png",
         });
 
-        res.json({
+        res.status(201).json({
             message: "User created successfully",
         });
+    } catch (err) {
+        console.error("CREATE USER ERROR:", err);
 
-        } catch (err) {
-            console.error("CREATE USER ERROR:", err);
-
-            res.status(500).json({
-                success: false,
-                message: "Failed to create user",
-                error: err.message,
-            });
-        }
+        res.status(500).json({
+            success: false,
+            message: "Failed to create user",
+            error: err.message,
+        });
+    }
 }
-
 
 /* =========================
    LOGIN
@@ -97,7 +123,8 @@ export async function loginUser(req, res) {
                 firstName: user.firstName,
                 lastName: user.lastName,
                 role: user.role,
-                isEmailVerified: user.isEmailVerified,
+                isEmailVerified:
+                    user.isEmailVerified,
                 image: user.image,
             },
             process.env.JWT_SECRET
@@ -105,26 +132,26 @@ export async function loginUser(req, res) {
 
         res.json({
             message: "Login successful",
-            token,
+            token: token,
             user: {
                 email: user.email,
                 firstName: user.firstName,
                 lastName: user.lastName,
                 role: user.role,
-                isEmailVerified: user.isEmailVerified,
+                isEmailVerified:
+                    user.isEmailVerified,
                 image: user.image,
             },
         });
-
     } catch (err) {
-        console.error(err);
+        console.error("LOGIN ERROR:", err);
 
         res.status(500).json({
             message: "Login failed",
+            error: err.message,
         });
     }
 }
-
 
 /* =========================
    ADMIN CHECK
@@ -138,7 +165,6 @@ export function isAdmin(req) {
     return req.user.role === "admin";
 }
 
-
 /* =========================
    CUSTOMER CHECK
 ========================= */
@@ -150,7 +176,6 @@ export function isCustomer(req) {
 
     return req.user.role === "user";
 }
-
 
 /* =========================
    GET CURRENT USER
@@ -165,7 +190,6 @@ export function getUser(req, res) {
 
     res.json(req.user);
 }
-
 
 /* =========================
    GOOGLE LOGIN
@@ -201,13 +225,20 @@ export async function googleLogin(req, res) {
         if (!user) {
             user = await User.create({
                 email: googleUser.email,
-                firstName: googleUser.given_name || "",
-                lastName: googleUser.family_name || "",
-                password: "abc",
+                firstName:
+                    googleUser.given_name || "",
+                lastName:
+                    googleUser.family_name || "",
+                password: bcrypt.hashSync(
+                    Math.random().toString(36),
+                    10
+                ),
+                role: "user",
                 isEmailVerified:
                     googleUser.email_verified || false,
                 image:
-                    googleUser.picture || "/user.png",
+                    googleUser.picture ||
+                    "/user.png",
             });
         }
 
@@ -229,7 +260,8 @@ export async function googleLogin(req, res) {
                 firstName: user.firstName,
                 lastName: user.lastName,
                 role: user.role,
-                isEmailVerified: user.isEmailVerified,
+                isEmailVerified:
+                    user.isEmailVerified,
                 image: user.image,
             },
             process.env.JWT_SECRET
@@ -250,16 +282,18 @@ export async function googleLogin(req, res) {
                 image: user.image,
             },
         });
-
     } catch (err) {
-        console.error(err);
+        console.error(
+            "GOOGLE LOGIN ERROR:",
+            err
+        );
 
         res.status(500).json({
             message: "Failed to login with google",
+            error: err.message,
         });
     }
 }
-
 
 /* =========================
    GET ALL USERS
@@ -276,31 +310,42 @@ export async function getAllUsers(req, res) {
         const users = await User.findAll();
 
         res.json(users);
-
     } catch (err) {
-        console.error(err);
+        console.error(
+            "GET ALL USERS ERROR:",
+            err
+        );
 
         res.status(500).json({
             message: "Failed to get users",
+            error: err.message,
         });
     }
 }
-
 
 /* =========================
    BLOCK / UNBLOCK USER
 ========================= */
 
-export async function blockOrUnblockUser(req, res) {
+export async function blockOrUnblockUser(
+    req,
+    res
+) {
+    console.log("BLOCK USER:", req.user);
+
     if (!isAdmin(req)) {
         return res.status(403).json({
             message: "Forbidden",
         });
     }
 
-    if (req.user.email === req.params.email) {
+    if (
+        req.user.email ===
+        req.params.email
+    ) {
         return res.status(400).json({
-            message: "You cannot block yourself",
+            message:
+                "You cannot block yourself",
         });
     }
 
@@ -308,7 +353,8 @@ export async function blockOrUnblockUser(req, res) {
         await User.updateByEmail(
             req.params.email,
             {
-                isBlock: req.body.isBlock,
+                isBlock:
+                    req.body.isBlock,
             }
         );
 
@@ -316,17 +362,19 @@ export async function blockOrUnblockUser(req, res) {
             message:
                 "User block status updated successfully",
         });
-
     } catch (err) {
-        console.error(err);
+        console.error(
+            "BLOCK USER ERROR:",
+            err
+        );
 
         res.status(500).json({
             message:
                 "Failed to block/unblock user",
+            error: err.message,
         });
     }
 }
-
 
 /* =========================
    SEND OTP
@@ -343,12 +391,14 @@ export async function sendOTP(req, res) {
 
     const otp = String(
         Math.floor(
-            100000 + Math.random() * 900000
+            100000 +
+                Math.random() * 900000
         )
     );
 
     try {
-        const user = await User.findByEmail(email);
+        const user =
+            await User.findByEmail(email);
 
         if (!user) {
             return res.status(404).json({
@@ -368,14 +418,16 @@ export async function sendOTP(req, res) {
         await transporter.sendMail({
             from: process.env.EMAIL_USER,
             to: email,
-            subject: "Your OTP for Password Reset",
+            subject:
+                "Your OTP for Password Reset",
 
             text: `Hi! Your one-time passcode is ${otp}. It’s valid for 10 minutes. If you didn’t request this, ignore this email. — Crystal Beauty Clear`,
 
             html: getDesignedEmail({
                 otp,
                 firstName:
-                    user.firstName || "there",
+                    user.firstName ||
+                    "there",
                 brandName:
                     "Crystal Beauty Clear",
                 supportEmail:
@@ -383,24 +435,28 @@ export async function sendOTP(req, res) {
                 colors: {
                     accent: "#fa812f",
                     primary: "#fef3e2",
-                    secondary: "#393e46",
+                    secondary:
+                        "#393e46",
                 },
             }),
         });
 
         res.json({
-            message: "OTP sent to your email",
+            message:
+                "OTP sent to your email",
         });
-
     } catch (err) {
-        console.error(err);
+        console.error(
+            "SEND OTP ERROR:",
+            err
+        );
 
         res.status(500).json({
             message: "Failed to send OTP",
+            error: err.message,
         });
     }
 }
-
 
 /* =========================
    CHANGE PASSWORD VIA OTP
@@ -413,14 +469,21 @@ export async function changePasswordViaOTP(
     const {
         email,
         otp,
-        newPassword
+        newPassword,
     } = req.body;
 
-    try {
-        const otpRecord = await OTP.findOne({
-            email,
-            otp,
+    if (!email || !otp || !newPassword) {
+        return res.status(400).json({
+            message: "Missing fields",
         });
+    }
+
+    try {
+        const otpRecord =
+            await OTP.findOne({
+                email,
+                otp,
+            });
 
         if (!otpRecord) {
             return res.status(400).json({
@@ -438,28 +501,38 @@ export async function changePasswordViaOTP(
                 10
             );
 
-        await User.updateByEmail(
-            email,
-            {
-                password: hashedPassword,
-            }
-        );
+        const updatedUser =
+            await User.updateByEmail(
+                email,
+                {
+                    password:
+                        hashedPassword,
+                }
+            );
+
+        if (!updatedUser) {
+            return res.status(404).json({
+                message: "User not found",
+            });
+        }
 
         res.json({
             message:
                 "Password changed successfully",
         });
-
     } catch (err) {
-        console.error(err);
+        console.error(
+            "CHANGE PASSWORD ERROR:",
+            err
+        );
 
         res.status(500).json({
             message:
                 "Failed to change password",
+            error: err.message,
         });
     }
 }
-
 
 /* =========================
    UPDATE USER DATA
@@ -492,17 +565,19 @@ export async function updateUserData(
             message:
                 "User data updated successfully",
         });
-
     } catch (err) {
-        console.error(err);
+        console.error(
+            "UPDATE USER ERROR:",
+            err
+        );
 
         res.status(500).json({
             message:
                 "Failed to update user data",
+            error: err.message,
         });
     }
 }
-
 
 /* =========================
    UPDATE PASSWORD
@@ -520,10 +595,13 @@ export async function updatePassword(
 
     const {
         currentPassword,
-        newPassword
+        newPassword,
     } = req.body;
 
-    if (!currentPassword || !newPassword) {
+    if (
+        !currentPassword ||
+        !newPassword
+    ) {
         return res.status(400).json({
             message: "Missing fields",
         });
@@ -563,7 +641,8 @@ export async function updatePassword(
         await User.updateByEmail(
             req.user.email,
             {
-                password: hashedPassword,
+                password:
+                    hashedPassword,
             }
         );
 
@@ -571,13 +650,16 @@ export async function updatePassword(
             message:
                 "Password updated successfully",
         });
-
     } catch (err) {
-        console.error(err);
+        console.error(
+            "UPDATE PASSWORD ERROR:",
+            err
+        );
 
         res.status(500).json({
             message:
                 "Failed to update password",
+            error: err.message,
         });
     }
 }
