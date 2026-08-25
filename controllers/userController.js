@@ -43,13 +43,15 @@ export async function createUser(req, res) {
             message: "User created successfully",
         });
 
-    } catch (err) {
-        console.error(err);
+        } catch (err) {
+            console.error("CREATE USER ERROR:", err);
 
-        res.status(500).json({
-            message: "Failed to create user",
-        });
-    }
+            res.status(500).json({
+                success: false,
+                message: "Failed to create user",
+                error: err.message,
+            });
+        }
 }
 
 
